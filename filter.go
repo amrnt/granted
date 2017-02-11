@@ -1,20 +1,31 @@
 package granted
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
-
-	"github.com/mohae/utilitybelt/deepcopy"
 )
 
-// FilterToInterface ...
-func (a *Authorize) FilterToInterface(i interface{}) interface{} {
-	o := deepcopy.Iface(i)
-	a.filter(o)
-	return o
+// Filter ...
+func Filter(i interface{}) interface{} {
+	return Default.filterToInterface(i)
 }
 
-// filter ...
+// FilterToJSON ...
+func FilterToJSON(i interface{}) string {
+	j, err := json.Marshal(Default.filterToInterface(i))
+	if err != nil {
+		return ""
+	}
+
+	return string(j)
+}
+
+func (a *Authorize) filterToInterface(i interface{}) interface{} {
+	a.filter(i)
+	return i
+}
+
 func (a *Authorize) filter(o interface{}) {
 	v := reflect.ValueOf(o)
 
@@ -22,12 +33,12 @@ func (a *Authorize) filter(o interface{}) {
 		return
 	}
 
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	} else {
-		panic("should be a reflect.Ptr")
+	if v.Kind() != reflect.Ptr {
+		// "should be a reflect.Ptr"
+		return
 	}
 
+	v = v.Elem()
 	switch v.Kind() {
 	case reflect.Struct:
 		a.filterStruct(v)
@@ -101,7 +112,8 @@ func (a *Authorize) filterField(v reflect.Value, t string, f reflect.Value) {
 	ts := strings.Split(t, ",")
 
 	for _, i := range ts {
-		if f.CanSet() && !a.hasAccess(v, i) {
+		// fmt.Println(f.Type())
+		if f.CanSet() && !a.canAccess(v, i) {
 			f.Set(reflect.Zero(f.Type()))
 		}
 	}
